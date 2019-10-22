@@ -1,0 +1,78 @@
+Question 1:
+Assuming the XINU text begins at address 0x0, draw a rough diagram of XINU's memory layout with addresses derived from your experimental measurements. 
+Include the information you uncovered from running your version of printsegaddress() and printprocstks().
+
+Answer:
+
+|					 |-->null process stack base address = [0x00fffffc]
+|stack				 |	Pid=0; process name = prnull
+|					 |-->stack pointer = [0x00ffff2c]
+|	null process	 |
+|--------------------|-->stack limit = [0x00fff000] 
+|stack				 |-->base address for main process = [0x00ffeff8]
+|					 |	Pid = 49; process name = main
+|	main process	 |-->stack pointer = [0x00ffef90]
+|____________________|-->stack limit = [0x00ffdffc]
+|....................|
+|....free memory.....|
+|....................|
+|____________________|
+|					 |
+|heap				 |
+|____________________|-->ebss = [0x00026b98]
+|					 |
+|bss(end)			 |
+|					 |
+|____________________|-->edata = [0x0001e53d]
+|					 |
+|data				 |
+| 					 |
+|____________________|-->etext = [0x000194dd]
+|					 |
+|					 |			
+|.text				 |
+|____________________|-->base_address = [0x00000000](assumed)
+
+The heirarchy of memory and their addresses above have been built according to the address information obtained from printsegaddress() and printprocstks() functions.
+
+Question 2:
+What is the difference in stack top address before and after calling printtos()? 
+Draw a diagram to illustrate what are the contents of the items pushed into the stack between these two time points.
+
+Answer:
+|________________|
+|				 | 
+|	old function |
+|	stack data	 |
+|________________|-->stack pointer just before printtos() function call is executed [0x00ffeff4]
+|		 		 |						|
+|	return		 |						|	
+|	address		 |						|
+|________________|                      | 8 bytes difference
+|	pushed base	 |						|
+|	pointer		 | 						|
+|  (old ebp)	 |						|
+|________________|-->stack pointer after printtos() function is called [0x00ffefec]
+
+The top of stack address just before calling the function is [0x00ffeff4]. 
+The top of the stack address just after the function call is [0x00ffefec].
+We can see that the difference between the two addresses is 8 byte (0x00ffeff4 - 0x00ffefec). 
+The stack content is each of 4 bytes.
+So out of the 8 bytes, 4 bytes are occupied by the old ebp i.e. ebp of the function that called printtos(). 
+The next 4 bytes are the return address of the calling function(address of the next instruction that will execute when the called fuction completes it's execution).
+The return address is pushed to stack by the call instruction and it is popped by return instruction. 
+
+Question 3:
+In a stack frame, local variables are stored below the top of the stack. In task 3, does your result show all the local variables declared in your printtos function? 
+If not, can you explain that? (hint: try to disable the compiler optimization by specifing -O0 in your Makefile)
+
+Answer: 
+
+No, the stack frame does not show all the local variables just below the top of the stack. 
+Navigating through the stack the local variables are stored at few(2-3) locations after base pointer.
+Though I expected to have fewer data on stack, there are few other buffers for temporary data pushed by the program due to compiler optimizations.
+Thus, local variables are 6-7 location from stack pointer.
+Some of the local variables that are not used but declared in function are not pushed to stack when optimization is ON.
+Also the compiler does some optimizations to reduce execution time, memory and power requirements and minimizes attributes of program executable.
+If the optimization is set to -O0 I can see the unsed local variables are also pushed to stack. 
+And the optimized data is no more in stack i.e. the program will do all the operations now that were actually optimized by compiler. 
