@@ -1,0 +1,53 @@
+1) What are the advantages and disadvantages of each of the two scheduling policies?
+Also, give the advantages and disadvantages of the round robin scheduling policy originally implemented in Xinu.
+Answer:
+
+Advantages:
+Linux-like Scheduling
+1) In this scheduling algorithm all the processes get fair chance to run because the scheduling is based on their goodness value with is directly related to the process's priority.
+2) Processes don't starve as their scheduling is based on their performance overall and there is no randomization.
+3) CPU time is completely utilized since it doesn't give null process a chance to run (as it's priority is zero thus the quantum time).
+4) The wait time for the lower priority processes is consider into acccount while calculating goodness values.
+
+Exponential Distribution Scheduling
+1) Since the scheduling is based on random value there is randomization in scheduling the processes which in turn gives lower priority processes chance to run and helps avoid starvation. 
+2) Process scheduling function is dependent on some exponential value thus when there will be 100s of processes runnning all might get the fair amount of schduling time, 
+except the case mentioned in point number 2 in disadvantages. 
+
+Disadvantages: 
+Linux-like Scheduling
+1) The main disadvantage of Linux-like scheduling will be visible when there will be many (100s of processes) running and read since it will add up the time of computation of quantum time , goodness value and epoch.
+2) As the scheduling is complex OS will have to keep track of every process(behavior of process in general) and if they have run to completion or not. This will be an extra overhead on CPU computations.
+3) If the higher priority process is ready to run but is not in currently running epoch it is not scheduled, it is sort of priority inversion issue. 
+Since lower priority tasks are running even when higher priority is in ready queue. But this effect is considerably small since it's within on epoch. But over all across epoch the chances are fair.
+4) This kind of scheduling cannot be implemented in RTOS where response time of highest priority tasks is most important(reason mention above) 
+
+Exponential Distribution Scheduling
+1) This scheduling doesn't give higher priority task a fair chance. Rather it runs the leastpriority task more(according to the experiment in testmain file). 
+(This result might be different if there are many processes running *can't comment on that because I did not experiment much with it but from testmain the above effect is visible)
+2) In certain cases there is a possibility of starvation too due to below condition:
+'If the random value is no less than the highest priority, the process with the largest priority is scheduled' 
+But that gives good chance to higher priority process to run. (Somewhat Xinu default scheduler like behavior.)
+
+Advantages and Disadvantages of Round Robin scheduling originally in Xinu
+Advantages:
+1) Easy to implement, less computation since it directlty depends on priority and time slicing mechanism.
+2) Higher priority tasks get good chance to run.
+
+Disadvantages:
+1) Process Starvation. Lower priority tasks starve if the higher priority tasks keeps getting created or scheduled(Higher priority processes have not completed their CPU utilization). 
+
+
+
+2)Describe the way each of the schedulers affects the NULL process.
+Answer: 
+
+Linux-like Scheduler:
+1) NULL process is never scheduled/or is last processes to be selected for scheduling since it's priority is zero thus it's quantum time is zero.
+
+Exponential Distribution:
+1) Null process is scheduled if it satisfies the condition of random value.
+2) Also Null process is scheduled when there is no other ready process in ready queue.
+
+Round Robin Scheduling in XINU (Default scheduling)
+1)NULL process is scheduled if there is no other process in ready queue.
