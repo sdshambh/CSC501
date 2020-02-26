@@ -7,8 +7,7 @@
 #include <sem.h>
 #include <mem.h>
 #include <io.h>
-#include <stdio.h>
-#include <lock.h>
+#include <paging.h>
 
 LOCAL int newpid();
 
@@ -28,7 +27,6 @@ SYSCALL create(procaddr,ssize,priority,name,nargs,args)
 	unsigned long	savsp, *pushsp;
 	STATWORD 	ps;    
 	int		pid;		/* stores new process id	*/
-	unsigned long *lck;			/*pointer to lock descriptor table*/
 	struct	pentry	*pptr;		/* pointer to proc. table entry */
 	int		i;
 	unsigned long	*a;		/* points to list of args	*/
@@ -42,13 +40,10 @@ SYSCALL create(procaddr,ssize,priority,name,nargs,args)
 	if (((saddr = (unsigned long *)getstk(ssize)) ==
 	    (unsigned long *)SYSERR ) ||
 	    (pid=newpid()) == SYSERR || priority < 1 ) {
-			//kprintf("ERROR HERE");
 		restore(ps);
 		return(SYSERR);
 	}
-	lck = (unsigned long *)(&args);
-	locktab[*(++lck)].lock_deleted[pid] = USINGLOCK; //using lock for new process after lock creation
-	proctab[pid].wait_lckid = -1;
+
 	numproc++;
 	pptr = &proctab[pid];
 
@@ -100,8 +95,60 @@ SYSCALL create(procaddr,ssize,priority,name,nargs,args)
 	*--saddr = 0;		/* %esi */
 	*--saddr = 0;		/* %edi */
 	*pushsp = pptr->pesp = (unsigned long)saddr;
-
+		//allocate page directory and set default 4 page directories mapped to actual physical location
+	pd_t* page_directory_ptr;
+	int frameNum;
+	int status = -1;
+	int x = 0;
+	status = get_frm(&frameNum);
+	if(status == SYSERR)
+	{
+		restore(ps);
+		return status;
+	}
+	frm_tab[frameNum].fr_status = FRM_MAPPED;
+	frm_tab[frameNum].fr_pid = pid ;
+	frm_tab[frameNum].fr_type = FR_DIR;
+	proctab[pid].pdbr = (frameNum + FRAME0) * NBPG;
+	page_directory_ptr = (pd_t*)((frameNum + FRAME0) * NBPG);
+	for(x = 0; x < NFRAMES; x++)
+	{
+		if(x<4)
+		{
+			page_directory_ptr->pd_pres = 1;
+			page_directory_ptr->pd_write = 1;
+			page_directory_ptr->pd_base = x + FRAME0;
+			page_directory_ptr->pd_user =0;
+			page_directory_ptr->pd_fmb = 0;
+			page_directory_ptr->pd_global = 0;
+			page_directory_ptr->pd_avail = 0;
+			page_directory_ptr->pd_pwt = 0;
+			page_directory_ptr->pd_pcd = 0;
+			page_directory_ptr->pd_acc = 0;
+			page_directory_ptr->pd_mbz = 0;
+		}
+		else
+		{
+			page_directory_ptr->pd_pres = 0;
+			page_directory_ptr->pd_write = 0;
+			page_directory_ptr->pd_base = 0;
+			page_directory_ptr->pd_user = 0;
+			page_directory_ptr->pd_fmb = 0;
+			page_directory_ptr->pd_global = 0;
+			page_directory_ptr->pd_avail = 0;
+			page_directory_ptr->pd_pwt = 0;
+			page_directory_ptr->pd_pcd = 0;
+			page_directory_ptr->pd_acc = 0;
+			page_directory_ptr->pd_mbz = 0;
+		}
+		
+		page_directory_ptr++;
+	}
+		
+		
+		
 	restore(ps);
+
 	return(pid);
 }
 

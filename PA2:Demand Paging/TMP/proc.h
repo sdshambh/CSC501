@@ -9,10 +9,6 @@
 #define	NPROC		30		/*  allowed if not already done	*/
 #endif
 
-#ifndef	NLOCKS
-#define NLOCKS		50		/* # of files allowed */
-#endif
-
 #ifndef	_NFILE
 #define _NFILE		20		/* # of files allowed */
 #endif
@@ -31,6 +27,11 @@
 #define	PRSUSP		'\006'		/* process is suspended		*/
 #define	PRWAIT		'\007'		/* process is on semaphore queue*/
 #define	PRTRECV		'\010'		/* process is timing a receive	*/
+
+/* process rescheduleing policy */
+
+#define RANDOMSCHED             1
+#define PROPORTIONALSHARE       2
 
 /* miscellaneous process definitions */
 
@@ -64,14 +65,20 @@ struct	pentry	{
 	int	fildes[_NFILE];		/* file - device translation	*/
 	int	ppagedev;		/* pageing dgram device		*/
 	int	pwaitret;
-	int process_ldesc[NLOCKS];
-	int process_lstate[NLOCKS];
-	int lpriority[NLOCKS];
-	//int process_lpriority[NLOCKS];
-	long process_lrqt_time;
-	int pprio_copy;
-	int wait_lckid;
-};
+
+/* for process scheduling*/
+        int     ppolicy;                /* process scheduling policy    */
+        int     ppi;                    /* priority value in psp        */
+        int     prate;                  /* rate value in psp            */
+
+/* for demand paging */
+        unsigned long pdbr;             /* PDBR                         */
+        int     store;                  /* backing store for vheap      */
+        int     vhpno;                  /* starting pageno for vheap    */
+        int     vhpnpages;              /* vheap size                   */
+        struct mblock *vmemlist;        /* vheap list              	*/
+		int flag_private_bsm;			/* if process is created using vcreate, flag that private backing store is allocated on bs demand*/
+		};
 
 
 extern	struct	pentry proctab[];

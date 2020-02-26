@@ -8,7 +8,8 @@
 #include <io.h>
 #include <q.h>
 #include <stdio.h>
-#include <lock.h>
+#include <paging.h>
+//@todo: add paging.h link in makefile 
 /*------------------------------------------------------------------------
  * kill  --  kill a process and remove it from the system
  *------------------------------------------------------------------------
@@ -18,7 +19,6 @@ SYSCALL kill(int pid)
 	STATWORD ps;    
 	struct	pentry	*pptr;		/* points to proc. table for pid*/
 	int	dev;
-	int wait_lock, x, max_prio = 0;
 
 	disable(ps);
 	if (isbadpid(pid) || (pptr= &proctab[pid])->pstate==PRFREE) {
@@ -41,62 +41,53 @@ SYSCALL kill(int pid)
 	send(pptr->pnxtkin, pid);
 
 	freestk(pptr->pbase, pptr->pstklen);
+	
+	//handle process destruction
+	int x = 0;
+	int status = -1;
+	int frameNum = -1;
+	//free pages
+	//free all frames and write back dirty pages to bsm
+	//remove bsm mapping
+	for(x = 0; x < NBSM; x++)
+	{
+		if(bsm_tab[x].bs_pid[pid] == 1)
+		{
+			status = bsm_unmap(pid, bsm_tab[x].bs_vpno[pid], 0);
+			if(status == SYSERR)
+			{
+				restore(ps);
+				return status;
+			}
+		}
+	}
+	//free page tables
+	//don't free up first 4 page tables since they are shared
+	for(x = 4 ; x < NFRAMES; x++)
+	{
+		if((frm_tab[x].fr_pid == pid ) && (frm_tab[x].fr_type == FR_TBL))
+		{
+			free_frm(x);
+		}
+	}
+	//free page directory and reset pdbr
+	frameNum = (proctab[pid].pdbr/NBPG) - FRAME0;
+	if(frameNum > 3)
+	{
+		frm_tab[frameNum].fr_pid = -1;
+		frm_tab[frameNum].fr_status = FRM_UNMAPPED;
+		frm_tab[frameNum].fr_type = FR_PAGE;
+		frm_tab[frameNum].fr_vpno = -1;
+		frm_tab[frameNum].fr_refcnt = 0;
+	}
+	proctab[pid].pdbr = 0;
+	
 	switch (pptr->pstate) {
 
 	case PRCURR:	pptr->pstate = PRFREE;	/* suicide */
 			resched();
 
 	case PRWAIT:	semaph[pptr->psem].semcnt++;
-					wait_lock = proctab[pid].wait_lckid;
-					dequeue(pid);
-					proctab[pid].wait_lckid = -1;
-					locktab[wait_lock].lprocess[pid] = 0;
-					
-		for(x = 0; x < NPROC; x++)
-		{
-			if(proctab[x].wait_lckid == wait_lock)
-			{
-				if(proctab[x].pprio > max_prio)
-				max_prio = proctab[x].pprio;
-			}
-		}
-		//update max waiting priority 
-		locktab[wait_lock].wait_priority_max = max_prio;
-		
-		//since max waiting priority changed update the process priorities for all process
-		for(x = 0; x<NPROC; x++)
-		{
-			if(locktab[wait_lock].lprocess[x] == 1)
-			{
-				if(proctab[x].pprio_copy > 0)
-				{
-					if(max_prio < proctab[x].pprio_copy)
-					{
-					proctab[x].pprio = proctab[x].pprio_copy;
-					proctab[x].pprio_copy = 0;
-					}
-					else
-					{
-					//proctab[x].pprio_copy = proctab[x].pprio;
-					proctab[x].pprio = max_prio;
-					//call for max check again 
-					lock_update(x,max_prio);
-					waiting_on_lock(x);
-					}
-				}
-				else
-				{
-					if(max_prio > proctab[x].pprio)
-					{
-					proctab[x].pprio_copy = proctab[x].pprio;
-					proctab[x].pprio = max_prio;
-					//call for max check again 
-					lock_update(x,max_prio);
-					waiting_on_lock(x);
-					}
-				}
-			}
-		}	
 
 	case PRREADY:	dequeue(pid);
 			pptr->pstate = PRFREE;
